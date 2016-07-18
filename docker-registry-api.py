@@ -11,13 +11,17 @@ def parse_args():
     '''
     Parse arguments
     '''
-    parser = argparse.ArgumentParser(description='Get images list from docker registry')
+    parser = argparse.ArgumentParser(description='Working with docker registry v2 api')
     parser.add_argument('-s', '--server', type=str, default=DEFAULT_SRV,
                         help='Registry server [default: {0}]'.format(DEFAULT_SRV))
-    parser.add_argument('--check', action='store_true')
-    parser.add_argument('--list-all', action='store_true')
-    parser.add_argument('--get-manifest', metavar='IMAGE', type=str)
-    parser.add_argument('--delete', metavar='IMAGE', type=str)
+    parser.add_argument('--check', action='store_true',
+                        help='Check connectivity')
+    parser.add_argument('--list-all', action='store_true',
+                        help='List all images and tags')
+    parser.add_argument('--get-manifest', metavar='IMAGE:TAG', type=str,
+                        help='Get image manifest')
+    parser.add_argument('--delete', metavar='IMAGE:TAG', type=str,
+                        help='Delete image by name')
     args = parser.parse_args()
 
     return args
@@ -79,7 +83,7 @@ def get_manifest(base_url, image):
     '''
     Get manifest by image name
 
-    return: {'name': name, 'tag': tag, 'manifest':manifest}
+    return: {'name': name, 'tag': tag, 'manifest': manifest}
     '''
     name, tag = parse_imagename(image)
     key = 'Docker-Content-Digest'
@@ -165,3 +169,6 @@ if __name__ == '__main__':
             delete(BASE_URL, manifest)
         else:
             print "Image not found"
+    else:
+        print "No action defined"
+
