@@ -15,7 +15,7 @@ def parse_args():
     parser.add_argument('-s', '--server', type=str, default=DEFAULT_SRV,
                         help='Registry server [default: {0}]'.format(DEFAULT_SRV))
     parser.add_argument('--check', action='store_true',
-                        help='Check connectivity')
+                        help='Check connectivity [default action]')
     parser.add_argument('--list-all', action='store_true',
                         help='List all images and tags')
     parser.add_argument('--get-manifest', metavar='IMAGE:TAG', type=str,
@@ -170,5 +170,6 @@ if __name__ == '__main__':
         else:
             print "Image not found"
     else:
-        print "No action defined"
+        # default action
+        check(BASE_URL)
 
