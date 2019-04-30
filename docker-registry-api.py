@@ -24,6 +24,7 @@ def parse_args():
                    help="Get image manifest")
     p.add_argument("--delete", metavar="IMAGE:TAG", type=str,
                    help="Delete image by name")
+    p.add_argument("--cleanup", metavar="IMAGE", type=str)
     return p.parse_args()
 
 
@@ -106,7 +107,7 @@ class Registry(object):
         for c in catalog:
             tags = requests.get("{0}/{1}/tags/list".format(self.base_url, c), verify=False).json()["tags"]
             result[c] = tags
-        
+
         return result
 
     def get_all(self):
@@ -127,14 +128,13 @@ class Registry(object):
         print("Error while removing image (status code: {0})".format(r.status_code))
         return True
 
-    def get_manifest(self, image):
+    def get_manifest(self, name, tag):
         """
         Get manifest by image name
 
-        Returns: (name, tag, manifest)
+        Returns: str (manifest)
         """
 
-        name, tag = parse_imagename(image)
         key = "Docker-Content-Digest"
 
         headers = {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
@@ -144,13 +144,36 @@ class Registry(object):
         r = requests.get(url=url, headers=headers, verify=False)
 
         if key in r.headers:
-            return(name, tag, r.headers[key])
+            return(r.headers[key])
 
         print("Manifest not found")
         return None
 
+    def cleanup(self, image, keep=10):
+        """Delete old tags for image"""
 
-if __name__ == "__main__":
+        all_images = self.get_all()
+        if image not in all_images:
+            print("image {0} don't found".format(image))
+            return
+
+        tags = all_images[image]
+        print("found {0} tags:\n  {1}".format(len(tags), ", ".join(tags)))
+        for idx, tag in enumerate(tags, start=1):
+            if tag == "latest":
+                print("-> skip latest")
+                continue
+            manifest = self.get_manifest(image, tag)
+            s = "[{3}/{4}] remove {0}:{1} {2}? [y/N] ".format(image, tag, manifest, idx, len(tags))
+            answer = raw_input(s)
+            if answer.lower() in ["y", "yes"]:
+                print("-> removing")
+                self.delete(image, manifest)
+            else:
+                print("-> skip")
+
+
+def main():
     args = parse_args()
 
     BASE_URL = "https://{0}/v2".format(args.server)
@@ -165,14 +188,22 @@ if __name__ == "__main__":
         all_images = registry.get_all()
         print_all(all_images)
     elif args.get_manifest:
-        _, _, manifest = registry.get_manifest(args.get_manifest)
+        name, tag = parse_imagename(args.get_manifest)
+        manifest = registry.get_manifest(name, tag)
         print(manifest)
     elif args.delete:
-        manifest = registry.get_manifest(args.delete)
+        name, tag = registry.get_manifest(name, tag)
+        manifest = registry.get_manifest(name, tag)
         if manifest:
             registry.delete(BASE_URL, manifest)
         else:
             print "Image not found"
+    elif args.cleanup:
+        registry.cleanup(args.cleanup)
     else:
         # default action
         registry.check_connection()
+
+
+if __name__ == "__main__":
+    main()
