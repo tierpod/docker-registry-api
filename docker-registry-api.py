@@ -2,174 +2,177 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import requests
 import textwrap
 
-DEFAULT_SRV = 'localhost:5000'
+import requests
+
+
+DEFAULT_SRV = "localhost:5000"
+
 
 def parse_args():
-    '''
-    Parse arguments
-    '''
-    parser = argparse.ArgumentParser(description='Working with docker registry v2 api')
-    parser.add_argument('-s', '--server', type=str, default=DEFAULT_SRV,
-                        help='Registry server [default: {0}]'.format(DEFAULT_SRV))
-    parser.add_argument('--check', action='store_true',
-                        help='Check connectivity [default action]')
-    parser.add_argument('--list-all', action='store_true',
-                        help='List all images and tags')
-    parser.add_argument('--get-manifest', metavar='IMAGE:TAG', type=str,
-                        help='Get image manifest')
-    parser.add_argument('--delete', metavar='IMAGE:TAG', type=str,
-                        help='Delete image by name')
-    args = parser.parse_args()
+    """Parse arguments"""
 
-    return args
+    p = argparse.ArgumentParser(description="Working with docker registry v2 api")
+    p.add_argument("-s", "--server", type=str, default=DEFAULT_SRV,
+                   help="Registry server [default: {0}]".format(DEFAULT_SRV))
+    p.add_argument("--check", action="store_true",
+                   help="Check connectivity [default action]")
+    p.add_argument("--list-all", action="store_true",
+                   help="List all images and tags")
+    p.add_argument("--get-manifest", metavar="IMAGE:TAG", type=str,
+                   help="Get image manifest")
+    p.add_argument("--delete", metavar="IMAGE:TAG", type=str,
+                   help="Delete image by name")
+    return p.parse_args()
 
 
 def parse_imagename(image):
-    '''
+    """
     Parse image name
 
     return: (name, tag)
-    '''
-    try:
-        name, tag = image.split(':')
-    except ValueError:
-        name, tag = image, 'latest'
+    """
 
-    if tag == '':
-        tag = 'latest'
+    try:
+        name, tag = image.split(":")
+    except ValueError:
+        name, tag = image, "latest"
+
+    if tag == "":
+        tag = "latest"
 
     return (name, tag)
 
 
-def do_request(url, headers=None, verify=False, method='GET'):
-    '''
-    Do request
+def print_all(all_images):
+    """Print all catalog information"""
 
-    return: reply object or exit
-    '''
-    print 'url: {url}'.format(url=url)
-    try:
-        if method == 'DELETE':
-            r = requests.delete(url, headers=headers, verify=verify)
-        else:
-            r = requests.get(url, headers=headers, verify=verify)
-        return r
-    except requests.exceptions.ConnectionError as error:
-        print error
-        exit(1)
-
-
-def check(base_url):
-    '''
-    Check connectivity to entrypoing /v2/
-
-    return: True
-    '''
-    url = '{base_url}/'.format(base_url=base_url)
-    r = do_request(url)
-
-    if r.status_code == 200 or r.status_code == 401:
-        print 'Connection succesful'
-    else:
-        return False
-
-    return True
-
-
-def get_manifest(base_url, image):
-    '''
-    Get manifest by image name
-
-    return: {'name': name, 'tag': tag, 'manifest': manifest}
-    '''
-    name, tag = parse_imagename(image)
-    key = 'Docker-Content-Digest'
-
-    headers = {'Accept': 'application/vnd.docker.distribution.manifest.v2+json'}
-    url = '{base_url}/{name}/manifests/{tag}'.format(base_url=base_url,
-                                                     name=name,
-                                                     tag=tag)
-    r = do_request(url, headers=headers)
-    if key in r.headers:
-        print 'Manifest: {0}'.format(r.headers[key])
-        return {
-            'name': name,
-            'tag': tag,
-            'manifest': r.headers[key]
-        }
-    else:
-        print 'Manifest not found'
-        return False
-
-    return True
-
-
-def delete(base_url, manifest):
-    '''
-    Delete image from registry by name and manifest
-    '''
-    url = '{base_url}/{name}/manifests/{manifest}'.format(base_url=base_url,
-                                                          name=manifest['name'],
-                                                          manifest=manifest['manifest'])
-    r = do_request(url, verify=False, method='DELETE')
-    if r.status_code == 202:
-        print "Image removed successful"
-    else:
-        print "Error while removing image (status code: {0})".format(r.status_code)
-
-    return True
-
-
-def list_all(base_url):
-    '''
-    List all images and tags in registry
-    '''
-    url = "{0}/_catalog".format(base_url)
-    catalog = do_request(url).json()['repositories']
-
-    wrapper = textwrap.TextWrapper(initial_indent='  ', subsequent_indent='  ',
+    wrapper = textwrap.TextWrapper(initial_indent="  ", subsequent_indent="  ",
                                    break_on_hyphens=False)
 
-    print "Found images for registry: {0} (total: {1})".format(base_url, len(catalog))
-    print wrapper.fill(' '.join(catalog))
-    print ""
+    print("Found images total: {0}".format(len(all_images)))
+    print(wrapper.fill(" ".join(all_images)))
+    print("")
 
-    for c in catalog:
-        tags = requests.get("{0}/{1}/tags/list".format(base_url, c), verify=False).json()['tags']
+    for image, tags in all_images.items():
         if tags:
-            print "Tags for image: {0} (total: {1})".format(c, len(tags))
-            print wrapper.fill(' '.join(tags))
+            print "Tags for image: {0} (total: {1})".format(image, len(tags))
+            print wrapper.fill(" ".join(tags))
         else:
-            print "No tags found for image: {0}".format(c)
+            print "No tags found for image: {0}".format(image)
         print ""
 
     return True
 
 
-if __name__ == '__main__':
+class Registry(object):
+
+    def __init__(self, base_url):
+        self.base_url = base_url
+
+    def check_connection(self):
+        """
+        Check connectivity to entrypoing /v2/
+
+        Returns: bool (True if connection successful)
+        """
+
+        url = "{0}/".format(self.base_url)
+        r = requests.get(url=url, verify=False)
+
+        if r.status_code == 200 or r.status_code == 401:
+            print("Connection succesful")
+            return True
+
+        return False
+
+    def get_catalog(self):
+        """Get all images catalog from repository"""
+
+        url = "{0}/_catalog".format(self.base_url)
+        catalog = requests.get(url=url, verify=False).json()["repositories"]
+        return catalog
+
+    def get_tags(self, catalog):
+        """Get all tags for all images from repostiry
+
+        Returns: dict({
+            "image": ["tag", ...]
+        })
+        """
+
+        result = {}
+        for c in catalog:
+            tags = requests.get("{0}/{1}/tags/list".format(self.base_url, c), verify=False).json()["tags"]
+            result[c] = tags
+        
+        return result
+
+    def get_all(self):
+        catalog = self.get_catalog()
+        return self.get_tags(catalog)
+
+    def delete(self, name, manifest):
+        """Delete image from registry by name and manifest"""
+
+        url = "{base_url}/{name}/manifests/{manifest}".format(base_url=self.base_url,
+                                                              name=name,
+                                                              manifest=manifest)
+        r = requests.delete(url, verify=False)
+        if r.status_code == 202:
+            print("Image removed successful")
+            return True
+
+        print("Error while removing image (status code: {0})".format(r.status_code))
+        return True
+
+    def get_manifest(self, image):
+        """
+        Get manifest by image name
+
+        Returns: (name, tag, manifest)
+        """
+
+        name, tag = parse_imagename(image)
+        key = "Docker-Content-Digest"
+
+        headers = {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
+        url = "{base_url}/{name}/manifests/{tag}".format(base_url=self.base_url,
+                                                         name=name,
+                                                         tag=tag)
+        r = requests.get(url=url, headers=headers, verify=False)
+
+        if key in r.headers:
+            return(name, tag, r.headers[key])
+
+        print("Manifest not found")
+        return None
+
+
+if __name__ == "__main__":
     args = parse_args()
 
-    BASE_URL = 'https://{0}/v2'.format(args.server)
+    BASE_URL = "https://{0}/v2".format(args.server)
 
     # Disable InsecureRequestWarning: Unverified HTTPS request...
     requests.packages.urllib3.disable_warnings()
+    registry = Registry(base_url=BASE_URL)
 
     if args.check:
-        check(BASE_URL)
+        registry.check_connection()
     elif args.list_all:
-        list_all(BASE_URL)
+        all_images = registry.get_all()
+        print_all(all_images)
     elif args.get_manifest:
-        get_manifest(BASE_URL, args.get_manifest)
+        _, _, manifest = registry.get_manifest(args.get_manifest)
+        print(manifest)
     elif args.delete:
-        manifest = get_manifest(BASE_URL, args.delete)
+        manifest = registry.get_manifest(args.delete)
         if manifest:
-            delete(BASE_URL, manifest)
+            registry.delete(BASE_URL, manifest)
         else:
             print "Image not found"
     else:
         # default action
-        check(BASE_URL)
-
+        registry.check_connection()
