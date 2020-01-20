@@ -57,12 +57,11 @@ def print_all(all_images):
     print("")
 
     for image, tags in all_images.items():
-        if tags:
-            print "Tags for image: {0} (total: {1})".format(image, len(tags))
-            print wrapper.fill(" ".join(tags))
-        else:
-            print "No tags found for image: {0}".format(image)
-        print ""
+        if not tags:
+            continue
+        print("Tags for image: {0} (total: {1})".format(image, len(tags)))
+        print(wrapper.fill(" ".join(tags)))
+        print("")
 
     return True
 
@@ -165,7 +164,7 @@ class Registry(object):
                 continue
             manifest = self.get_manifest(image, tag)
             s = "[{3}/{4}] remove {0}:{1} {2}? [y/N] ".format(image, tag, manifest, idx, len(tags))
-            answer = raw_input(s)
+            answer = input(s)
             if answer.lower() in ["y", "yes"]:
                 print("-> removing")
                 self.delete(image, manifest)
@@ -192,12 +191,12 @@ def main():
         manifest = registry.get_manifest(name, tag)
         print(manifest)
     elif args.delete:
-        name, tag = registry.get_manifest(name, tag)
+        name, tag = parse_imagename(args.delete)
         manifest = registry.get_manifest(name, tag)
         if manifest:
-            registry.delete(BASE_URL, manifest)
+            registry.delete(name, manifest)
         else:
-            print "Image not found"
+            print("Image {0} not found".format(args.delete))
     elif args.cleanup:
         registry.cleanup(args.cleanup)
     else:
